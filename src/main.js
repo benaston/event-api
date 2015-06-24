@@ -1,21 +1,21 @@
 ;(function(root) {
-	'use strict';
+  'use strict';
 
-	var namespace = {};
+  var namespace = {};
 
-	@@event-api-registry
+  @@registry
 
-	@@event-api
+  @@api
 
-	@@event-api-connection-coordinator
+  @@connector
 
-	if ((typeof exports === 'object') && module) {
-		module.exports = namespace; // CommonJS
-	} else if ((typeof define === 'function') && define.amd) {
-		define(function() {
-			return namespace;
-		}); // AMD
-	} else {
-		root.eventApi = namespace; // Browser
-	}
+  if ((typeof exports === 'object') && module) {
+    module.exports = namespace; // CommonJS
+  } else if ((typeof define === 'function') && define.amd) {
+    define(function() {
+      return namespace;
+    }); // AMD
+  } else {
+    root.eventApi = namespace; // Browser
+  }
 }(this));

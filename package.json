@@ -1,17 +1,23 @@
 {
   "name": "event-api",
-  "version": "0.0.8",
+  "version": "2.0.5",
   "description": "Provides a declarative API for wiring up evented components.",
   "keywords": ["events", "declarative", "api", "event", "event api"],
   "homepage": "https://github.com/benaston/event-api",
-  "bugs": { "url" : "https://github.com/benaston/event-api/issues", 
-            "email" : "ben@bj.ma" },
+  "bugs": {
+    "url": "https://github.com/benaston/event-api/issues",
+    "email": "ben@bj.ma"
+  },
   "license": "MIT",
   "files": ["dist/*"],
   "main": "dist/event-api.min.js",
   "private": false,
   "dependencies": {},
-  "author": { "name" : "Ben Aston", "email" : "ben@bj.ma", "url" : "http://www.bj.ma" },
+  "author": {
+    "name": "Ben Aston",
+    "email": "ben@bj.ma",
+    "url": "http://www.bj.ma"
+  },
   "devDependencies": {
     "grunt": "^0.4.5",
     "grunt-contrib-concat": "~0.3.0",

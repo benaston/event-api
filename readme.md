@@ -2,17 +2,23 @@
 
 Provides a declarative API for wiring up evented components.
 
-File size: 2,719 bytes.<br/>
-Supported platforms: server and browser.<br/>
-Supported language versions: ES5 and above.
+File size: **2,474 bytes**.<br/>
+Supported platforms: **server and browser**.<br/>
+Supported language versions: **ES5 and above**.
 
-Supports dynamic component loading (see example 2).
+Supports dynamic component loading.
+
+If you use this library in your software please tweet me @benastontweet.
+
+## Installation
+
+```npm install event-api```
 
 ## Example
 
-Say you have two APIs acting as interfaces for two software components. `api2` raises `error` events and you want `api1` notified of these events.
+Say you have two APIs acting as interfaces for two software components. `api1` needs to be notified about error events raised by `api2`.
 
-Neither API need know about each other. **EventApi** enables `api1` to respond to events raised by `api2` via a mediating object. 
+**EventApi** enables `api1` to respond to events raised by `api2` via a mediating object. Neither API need know about each other. 
 
 Like so:
 
@@ -21,15 +27,15 @@ var eventApi = require('event-api');
 
 // First, create two APIs with an EventApi on their prototype...
 function Api1() {}
-Api1.prototype = Object.create(eventApi.EventApi.prototype);
-Api1.prototype.constructor = Api1; // Used by event-api.
+Api1.prototype = Object.create(eventApi.api);
+Api1.prototype.name = 'Api1'; // Used by event-api.
 Api1.prototype.onErrorFromApi2 = function () {
     console.log('Api1::onErrorFromApi2 invoked!');
 };
 
 function Api2() {}
-Api2.prototype = Object.create(eventApi.EventApi.prototype);
-Api2.prototype.constructor = Api2; // Used by event-api.
+Api2.prototype = Object.create(eventApi.api);
+Api2.prototype.name = 'Api2'; // Used by event-api.
 Api2.prototype.events = { error: 1 };
 
 // Now create a connect-command to encapsulate the wire-up between the two APIs...
@@ -37,9 +43,9 @@ function Api1ConnectCommand() {
     this.subjectApiName = 'Api1'; // The API this connect command is for.
     this.objectApiNames = [ 'Api2' ]; // The API(s) this connect command links the subject API together with.
 
-    this.run = function (apiRegistry) {
-      var api1 = apiRegistry[this.subjectApiName];
-      var api2 = apiRegistry[this.objectApiNames[0]];
+    this.run = function (registry) {
+      var api1 = registry[this.subjectApiName];
+      var api2 = registry[this.objectApiNames[0]];
       
       if(api2) {
         api2.on(api2.events.error)
@@ -50,51 +56,47 @@ function Api1ConnectCommand() {
 }
 
 // Let's new everything up...
-var apiRegistry = {},
+var registry = {},
     api1 = new Api1(), 
     api2 = new Api2(),
     api1ConnectCmd = new Api1ConnectCommand(api1, api2);
 
-// ...and finally, create a connection coordinator to help us manage the loaded APIs 
-var coord = new eventApi.EventApiConnectionCoordinator([ api1ConnectCmd ], apiRegistry, { initialApisToLoad: [ api1, api2 ] });
+// ...and finally, create a connector object to help us wire-up the loaded APIs 
+var connector = new eventApi.Connector([ api1ConnectCmd ], { initialApisToLoad: [ api1, api2 ] });
 
 // Api2 now has a single subscriber to its error event...
-console.log(coord.apiRegistry['Api2'].subscribers[api2.events.error].length); // Logs 1
+console.log(connector.registry['Api2'].subscribers[api2.events.error].length); // Logs 1
 
-// You can now publish an event on Api2, and Api1 will be notified
-api2.publish(api2.events.error); // Logs 'Api1::onErrorFromApi2 invoked!'
+// You can now emit an event on Api2, and Api1 will be notified
+api2.emit(api2.events.error); // Logs 'Api1::onErrorFromApi2 invoked!'
 
 // You can also unload an API at runtime...
-coord.unloadApi('Api1');
+connector.unloadApi('Api1');
 
 // Now when you raise an event from Api2, nothing is logged...
-api2.publish(api2.events.error); // Nothing is written to the console
+api2.emit(api2.events.error); // Nothing is written to the console
 
 // ..and the subscriptions for the unloaded API have been deleted...
-console.log(coord.apiRegistry['Api2'].subscribers[api2.events.error].length) // Logs 0
+console.log(connector.registry['Api2'].subscribers[api2.events.error].length) // Logs 0
 
 // You can re-load Api1 at runtime to return to how you were before it was unloaded...
-coord.loadApi(api1);
-api2.publish(api2.events.error);  // Logs 'Api1::onErrorFromApi2 invoked!'
+connector.loadApi(api1);
+api2.emit(api2.events.error);  // Logs 'Api1::onErrorFromApi2 invoked!'
 
 ```
 
 ## Main Concepts
 
- - **EventApi** - a constructor function to be used as the prototype for APIs that support publish/subscribe semantics.
- - **EventApiRegistry** - an object literal used as a store for references to the `EventApi`s loaded at any given moment.
- - **EventApiConnectionCoordinator** - a constructor function containing functionality for loading and unloading `EventApi`s.
- - **ConnectCommands** - constructor functions you write following the command pattern to encapsulate the relationship between `EventApi`s. 
+ - **api** - an object to be used as the prototype for APIs that support emit/subscribe semantics.
+ - **registry** - an object used as a store for references to the `api`s loaded at any given moment.
+ - **Connector** - a constructor function containing functionality for loading and unloading `api`s.
+ - **ConnectCommands** - constructor functions you write following the command pattern to encapsulate the relationship between `api`s. 
  
-### In Prose 
+First, for each software component in your application that you want to communicate via **EventApi**, create an API object with `api` on its prototype. These APIs act as the entry and exit points for events into and out of your software components. 
 
-First, for each software component in your application that you want to communicate via **EventApi**, create an API object with `EventApi` on its prototype. These APIs act as the entry and exit points for events into and out of your software components. 
+Then, for each of those `api`s, create a single `ConnectCommand` to encapsulate the knowledge of who that API should listen to and how it should respond. Note: no business-logic is present in the connect commands; just pointers to functions. 
 
-Then, for each of those `EventApi`s, create a single `ConnectCommand` to encapsulate the knowledge of who that API should listen to and how it should respond. Note: no business-logic is present in the connect commands; just pointers to functions. 
-
-Now with your `EventApi`s and `ConnectCommands` in place, instantiate a single `EventApiConnectionCoordinator` and a corresponding single `EventApiRegistry` for your application. This will enable graceful runtime loading and unloading of components. 
-
-The `EventApiRegistry` is an implementation-detail and acts as a central store for the loaded APIs. 
+Now with your `api`s and `ConnectCommands` in place, instantiate a single `Connector` for your application. This will enable graceful runtime loading and unloading of components. 
 
 And... you're done. 
 
@@ -106,19 +108,17 @@ myApi.on(myApi.events.error)
      .byCalling('onEventFromMyApi');
 ```
 
-### In a Picture
-
-![Alt text](./diagram.png "How EventApi hangs together.")
-
 ## Example 2
 
 What happens when another API, `Api3`, is subscribed to `Api4` via its connect command, but `Api4` is not loaded when `Api3` is loaded?
 
 ```javascript
+var eventApi = require('event-api');
+
 // First, create the API constructor functions...
 function Api3() {}
-Api3.prototype = new eventApi.EventApi();
-Api3.prototype.constructor = Api3;
+Api3.prototype = Object.create(eventApi.api);
+Api3.prototype.name = 'Api3';
 Api3.prototype.onEventFromApi4 = function () {
     console.log('Api3::onEventFromApi4 invoked!');
 };
@@ -127,13 +127,13 @@ Api3.prototype.onEventFromApi5 = function () {
 };
 
 function Api4() {}
-Api4.prototype = new eventApi.EventApi();
-Api4.prototype.constructor = Api4;
+Api4.prototype = Object.create(eventApi.api);
+Api4.prototype.name = 'Api4';
 Api4.prototype.events = { api4Event: 1 };
 
 function Api5() {}
-Api5.prototype = new eventApi.EventApi();
-Api5.prototype.constructor = Api5;
+Api5.prototype = Object.create(eventApi.api);
+Api5.prototype.name = 'Api5';
 Api5.prototype.events = { api5Event: 1 };
 
 // Now create a connect-command to encapsulate the wire-up between the three APIs.
@@ -142,10 +142,10 @@ function Api3ConnectCommand() {
     this.subjectApiName = 'Api3'; 
     this.objectApiNames = [ 'Api4', 'Api5' ]; 
 
-    this.run = function (apiRegistry) {
-        var api3 = apiRegistry[this.subjectApiName];
-        var api4 = apiRegistry[this.objectApiNames[0]];
-        var api5 = apiRegistry[this.objectApiNames[1]];
+    this.run = function (registry) {
+        var api3 = registry[this.subjectApiName];
+        var api4 = registry[this.objectApiNames[0]];
+        var api5 = registry[this.objectApiNames[1]];
         
         if(api4) {
             api4.on(api4.events.api4Event)
@@ -166,35 +166,25 @@ var api3 = new Api3(),
     api5 = new Api5(),  
     api3ConnectCmd = new Api3ConnectCommand();
 
-// ...and create the connection coordinator. 
+// ...and create the connector. 
 // Note that Api4 is still nowhere to be seen...
-var coord = new eventApi.EventApiConnectionCoordinator([ api3ConnectCmd ], { initialApisToLoad: [ api3, api5 ] });
+var connector = new eventApi.Connector([ api3ConnectCmd ], { initialApisToLoad: [ api3, api5 ] });
 
 // Api3 and Api5 are now wired up...
-api5.publish(api5.events.api5Event);  // Logs 'Api3::onEventFromApi5 invoked!'
+api5.emit(api5.events.api5Event);  // Logs 'Api3::onEventFromApi5 invoked!'
 
 // Now let's load Api4 dynamically...
 var api4 = new Api4();
 
 // Simply instantiating Api4 does not wire it up...
-api4.publish(api4.events.api4Event);  // Nothing is logged to the console.
+api4.emit(api4.events.api4Event);  // Nothing is logged to the console.
 
-coord.loadApi(api4);
+connector.loadApi(api4);
 
 // Loading Api4 causes Api3 to complete its subscriptions, and register to be notified of events from the newly loaded Api4.
-api4.publish(api4.events.api4Event);  // Logs 'Api3::onEventFromApi4 invoked!'
+api4.emit(api4.events.api4Event);  // Logs 'Api3::onEventFromApi4 invoked!'
 
 ```
-
-## Tech Notes
-
-This library makes use of the following functions that may need to be poly-filled:
-
- - `Array.filter`
- - `Array.map`
- - `Array.reduce`
- - `Object.create`
- - `Object.getOwnPropertyNames`
  
 ## License & Copyright
 
